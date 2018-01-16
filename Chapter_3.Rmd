@@ -1,0 +1,103 @@
+---
+title: 'Kafli 3: Forvinnsla gagna'
+subtitle: 'Applied Predictive Modeling'
+author: "Hlynur Hallgrímsson"
+date: "15 janúar 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Í þessari færslu ætla ég að vinna mig í gegnum æfingarnar í þriðja kafla bókarinnar [Applied Predictive Modeling](http://appliedpredictivemodeling.com/) eftir Max Kuhn og Kjell Johnson. 
+
+### 3.1 Gler
+
+Í fyrstu æfingunni notumst við við gagnasett úr *The UC Irvine Machine Learning Repository* sem snýr að greiningu mismunandi tegunda glers út frá ljósbrotsstuðli og samspili 8 mismunandi frumefna: **Na, Mg Al, Si, K, Ca, Ba** og **Fe**. 
+
+Við nálgumst gögnin í `mlbench` pakkann, en auk hans hlöðum við inn öðrum pökkum sem við munum nota við úrvinnslu verkefnisins. 
+
+
+```{r 3_1_load_packages, message = FALSE}
+library(mlbench)
+library(AppliedPredictiveModeling)
+library(tidyverse)
+library(corrplot)
+library(caret)
+```
+
+Nú þegar við höfum hlaðið inn `mlbench` pakkann getum við sótt gögnin með `data()` aðgerðinni.
+
+```{r 3_1_load_data}
+data(Glass)
+str(Glass)
+
+```
+
+Leiðbeiningarnar eru eftirfarandi
+
+* a) Using vizualisations, explore the predictor variables to understand their distributions as well as the relationships between predictors
+* b) Do there appear to be any outliers in the data? Are any predictors skewed?
+* c) Are there any relevant transformations of one or more predictors that might improve the classification model?
+
+
+
+Eins og svo oft er ef til vill best hér að byrja með tíðniriti eða þéttniriti til að sjá dreifingu gilda innan hverrar skýribreytu. 
+
+```{r 3_1_tidnirit}
+#Tíðnirit
+Glass %>%
+  gather(-Type, key = "efni", value = "gildi") %>%
+  ggplot(mapping = aes(x = gildi)) +
+    geom_density() +
+    facet_wrap(~efni, scales = "free")
+
+#Boxplott
+Glass %>%
+  gather(-Type, key = "efni", value = "gildi") %>%
+  ggplot(mapping = aes(x = efni, y = gildi)) +
+  geom_boxplot()
+
+```
+
+Við sjáum að þónokkur skekking er til staðar fyrir efnin **Ba, Ca, Fe** og ljósbrotsstuðulinn **RI**. Auk þess eru **K** og **Mg** tvítoppa. Þá virðist vera nokkuð greinilegur útlagi í **K**. 
+
+Því næst skoðum við fylgnirit milli skýribreytanna og notum til þess `corrplot` pakkann sem við höfum nú þegar hlaðið inn. 
+
+```{r 3_1_fylgnirit}
+#Skilgreinum hvaða dálkar innihalda skýribreytur svo hægt sé að vísa til þeirra með nafni
+skyribreytur <- names(Glass)[1:9]
+
+#Til að laga corrplot er merkingum ása leyft að fara yfir spássíur með eftirfarandi breytingu
+par(xpd = TRUE)
+#Fylgniplott
+fylgni <- cor(Glass[, skyribreytur])
+corrplot(fylgni, method = "square", mar = c(1, 1, 1, 1))
+```
+
+Við sjáum strax að það er eitthvað um fylgni milli skýribreyta. Sterkust er greinilega jákvæð fylgni milli ljósbrotsstuðulsins **RI** og svo **Ca** og þvínæst neikvæð fylgni milli ljósbrotsstuðulsins **RI** og **Si**. Þess fyrir utan er erfitt að gera sér grein fyrir því út frá litunum hver fylgnin sé í raun. Ef til vill væri þægilegt að sjá þetta sett fram sem stöplarit. 
+  
+
+
+```{r 3_1_fylgni_stoplarit}
+fylgni_df <- as_data_frame(fylgni) %>% 
+  mutate(names = rownames(fylgni)) %>% 
+  gather(-names, key = "key", value = "Fylgni") %>% 
+  mutate(var_1 = pmin(names, key), # Setjum breytuna sem er á undan í stafrófinu í dálkinn var_1
+         var_2 = pmax(names, key)) %>% # og breytuna sem er á eftir í stafrófinu í dálkinn var_2
+  distinct(var_1, var_2, Fylgni) %>% # og er hægt að ná í einstakar samsetningar með distinct
+  filter(var_1 != var_2) %>% # Fjarlægjum fylgni breytu við sjálfa sig 
+  arrange(Fylgni)
+
+fylgni_df %>% 
+  unite(var_1, var_2, sep = "/", col = "Efni") %>% 
+  filter(abs(Fylgni) > 0.3) %>% # Fjarlægjum fylgni sem er ekki meiri en +- 0.3
+  mutate(Formerki = if_else(Fylgni >= 0, "Jákvætt", "Neikvætt")) %>% 
+  ggplot(mapping = aes(x = as.numeric(rownames(.)), y = Fylgni, fill = Formerki)) +
+  geom_bar(stat = "identity") +
+  geom_text(mapping = aes(label = Efni, vjust = if_else(Fylgni > 0, -0.9, 1.6))) +
+  scale_x_continuous(breaks = NULL, labels = NULL, name = "Samsetningar") +
+  geom_hline(yintercept = 0)
+```
+
