@@ -88,11 +88,25 @@ fylgni_df <- as_data_frame(fylgni) %>%
          var_2 = pmax(names, key)) %>% # og breytuna sem er á eftir í stafrófinu í dálkinn var_2
   distinct(var_1, var_2, Fylgni) %>% # og er hægt að ná í einstakar samsetningar með distinct
   filter(var_1 != var_2) %>% # Fjarlægjum fylgni breytu við sjálfa sig 
-  arrange(Fylgni)
+  arrange(Fylgni) %>% 
+  unite(var_1, var_2, sep = "/", col = "Efni")
+
+nota_palette <- c("#bbbbbb", "#F8766D", "#00BFC4")
+throskuldur <- 0.32
 
 fylgni_df %>% 
-  unite(var_1, var_2, sep = "/", col = "Efni") %>% 
-  filter(abs(Fylgni) > 0.3) %>% # Fjarlægjum fylgni sem er ekki meiri en +- 0.3
+  mutate(Skipting = case_when(Fylgni > throskuldur ~ "Tiltölulega sterk jákvæð fylgni",
+                              Fylgni < -throskuldur ~ "Tiltölulega sterk neikvæð fylgni",
+                              TRUE ~ "Minni fylgni")) %>% 
+  ggplot(mapping = aes(x = as.numeric(rownames(.)), y = Fylgni, fill = Skipting)) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(breaks = NULL, labels = NULL, name = "Samsetningar") +
+  scale_fill_manual(values = nota_palette) +
+  geom_hline(yintercept = 0)
+
+
+fylgni_df %>% 
+  filter(abs(Fylgni) > 0.32) %>% # Fjarlægjum fylgni sem er ekki meiri en +- 0.32
   mutate(Formerki = if_else(Fylgni >= 0, "Jákvætt", "Neikvætt")) %>% 
   ggplot(mapping = aes(x = as.numeric(rownames(.)), y = Fylgni, fill = Formerki)) +
   geom_bar(stat = "identity") +
@@ -100,4 +114,24 @@ fylgni_df %>%
   scale_x_continuous(breaks = NULL, labels = NULL, name = "Samsetningar") +
   geom_hline(yintercept = 0)
 ```
+
+Þá sjáum við að ef að við notum ljósbrotsstuðul **RI** sem skýribreytu fyrir tegund glersins, þá er efnið **Ca** að fara að veita okkur minnstar viðbótarupplýsingar, og öfugt. Þannig væri líklega okkar fyrsta verk að fjarlægja annað hvort **RI** eða **Ca** sem skýribreytu ef að við vildum fækka fjölda skýribreyta til að einfalda spálíkanið okkar. 
+
+# Forvinnsluaðgerðir
+## Til að leiðrétta fyrir skekkingu í dreifingu
+
+
+Til að leiðrétta fyrir skekkingu í dreifingu skýribreytanna væri ákjósanlegt að geta beitt fyrir sig Box-Cox umbreytingu. Til þess þurfa öll gildi að vera stærri en núll. Því þurfum við að athuga hvort einhver núllgildi eða neikvæð gildi leynist í einhverjum skýribreytanna. Til þess að auðvelda okkur það búum við til fallið `null_eda_neikvaett`.
+
+```{r er_null_e_neikvaett}
+null_eda_neikvaett <- function(x) {x <= 0}
+map(Glass[, skyribreytur], ~sum(null_eda_neikvaett(.))) %>% unlist()
+```
+
+Við sjáum því strax að Box-Cox umbreyting er ekki valkostur, né þá heldur log-umbreyting. 
+
+
+
+
+
 
