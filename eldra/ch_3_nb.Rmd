@@ -1,14 +1,7 @@
 ---
-title: 'Kafli 3: Forvinnsla gagna'
-subtitle: 'Applied Predictive Modeling'
-author: "Hlynur Hallgrímsson"
-date: "15 janúar 2018"
-output: html_document
+title: "R Notebook"
+output: html_notebook
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 Í þessari færslu ætla ég að vinna mig í gegnum æfingarnar í þriðja kafla bókarinnar [Applied Predictive Modeling](http://appliedpredictivemodeling.com/) eftir Max Kuhn og Kjell Johnson. 
 
@@ -132,9 +125,6 @@ Einungis **RI, Na, Al, Si** og **Ca** innihalda jákvæð gildi, en hin ekki. Við s
 ```{r 3_1_yj}
 
 ```
-
-
-
 
 
 
