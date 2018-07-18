@@ -16,7 +16,7 @@ output: html_notebook
 Við nálgumst gögnin í `mlbench` pakkann, en auk hans hlöðum við inn öðrum pökkum sem við munum nota við úrvinnslu verkefnisins. 
 
 
-```{r 3_1_load_packages, warning = FALSE}
+```{r 3_1_load_packages, warning = FALSE, echo = TRUE}
 library(mlbench)
 library(AppliedPredictiveModeling)
 library(tidyverse)
