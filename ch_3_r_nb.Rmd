@@ -23,9 +23,10 @@ library(tidyverse)
 library(corrplot)
 library(caret)
 library(viridis)
+library(yardstick)
 ```
 
-Nú þegar við höfum hlaðið inn `mlbench` pakkanum getum við sótt gögnin með `data()` aðgerðinni.
+Nú þegar við höfum hlaðið inn `mlbench` pakkanum getum við sótt `Glass` gögnin með `data()` aðgerðinni og skoðum strúktúr gagnanna með `str()` fallinu.
 
 ```{r 3_1_load_data}
 data(Glass)
@@ -34,7 +35,11 @@ str(Glass)
 
 ```
 
-Leiðbeiningarnar eru eftirfarandi
+Við sjáum að `Glass` er gagnarammi með 214 athugunum á 10 breytum. Þar af eru níu talnabreytur og ein þáttabreyta. 
+
+Nú skulum við vinda okkur í verkefnin.
+
+#### Leiðbeiningarnar eru eftirfarandi
 
 * a) Using vizualisations, explore the predictor variables to understand their distributions as well as the relationships between predictors
 * b) Do there appear to be any outliers in the data? Are any predictors skewed?
@@ -45,7 +50,7 @@ Leiðbeiningarnar eru eftirfarandi
 Eins og svo oft er ef til vill best hér að byrja með tíðniriti eða þéttniriti til að sjá dreifingu gilda innan hverrar skýribreytu. 
 
 ```{r 3_1_tidnirit}
-#Tíðnirit
+#Þéttnirit
 Glass %>%
   gather(-Type, key = "efni", value = "gildi") %>%
   ggplot(mapping = aes(x = gildi)) +
@@ -75,7 +80,7 @@ fylgni <- cor(Glass[, skyribreytur])
 corrplot(fylgni, method = "square", mar = c(1, 1, 1, 1))
 ```
 
-Við sjáum strax að það er eitthvað um fylgni milli skýribreyta. Sterkust er greinilega jákvæð fylgni milli ljósbrotsstuðulsins **RI** og svo **Ca** og þvínæst neikvæð fylgni milli ljósbrotsstuðulsins **RI** og **Si**. Þess fyrir utan er erfitt að gera sér grein fyrir því út frá litunum hver fylgnin sé í raun. Ef til vill væri þægilegt að sjá þetta sett fram sem stöplarit. 
+Við sjáum strax að það er eitthvað um fylgni milli skýribreyta. Sterkust er greinilega jákvæð fylgni milli ljósbrotsstuðulsins **RI** og svo **Ca** og þvínæst neikvæð fylgni milli ljósbrotsstuðulsins **RI** og **Si**. Þess fyrir utan er erfitt að gera sér grein fyrir því út frá litunum hver fylgnin sé í raun. Ef til vill væri þægilegt breyta litunum, og jafnvel að sjá þetta sett fram sem stöplarit. 
   
 
 
@@ -87,11 +92,11 @@ fylgni_df <- as_data_frame(fylgni) %>%
          var_2 = pmax(names, key)) %>% # og breytuna sem er á eftir í stafrófinu í dálkinn var_2
   distinct(var_1, var_2, Fylgni) # og er hægt að ná í einstakar samsetningar með distinct
 
-# fylgni_df %>% 
-#   mutate(Fylgni = if_else(var_1 == var_2, NA_real_, Fylgni)) %>% 
-#   ggplot(mapping = aes(x = var_1, y = var_2, fill = abs(Fylgni))) + 
-#   geom_tile() + 
-#   scale_fill_viridis()
+fylgni_df %>%
+  mutate(Fylgni = if_else(var_1 == var_2, NA_real_, Fylgni)) %>%
+  ggplot(mapping = aes(x = var_1, y = var_2, fill = abs(Fylgni))) +
+  geom_tile() +
+  scale_fill_viridis()
 
 fylgni_df_utd <- fylgni_df %>% 
   filter(var_1 != var_2) %>% # Fjarlægjum fylgni breytu við sjálfa sig 
@@ -136,7 +141,7 @@ Glass[, skyribreytur] %>%
 map(~sum(. <= 0)) %>% unlist()
 ```
 
-Einungis **RI, Na, Al, Si** og **Ca** innihalda bara jákvæð gildi, en hin ekki. Við sjáum því strax að Box-Cox umbreyting er ekki valkostur fyrir allar skýribreyturnar, né þá heldur log-umbreyting. Þá prófum við Yeo-Johnson umbreytingu, en hún er ekki alls ósvipuð Box-Cox nema fyrir það að gildi mega vera neikvæð eða núll. Til þess að kalla fram slíka umbreytingu getum við notað `preProcess()` fallið úr `caret` pakkanum, sem skrifaður er af Max Kuhn, öðrum höfundi bókarinnar.
+Einungis **RI, Na, Al, Si** og **Ca** innihalda bara jákvæð gildi, en hin ekki. Við sjáum því strax að Box-Cox umbreyting er ekki valkostur fyrir allar skýribreyturnar, né þá heldur log-umbreyting. Þá prófum við Yeo-Johnson umbreytingu, en hún er ekki alls ósvipuð Box-Cox nema fyrir það að gildi mega vera neikvæð eða núll. Raunar er Yeo-Johnson umbreytingin í reynd Box-Cox umbreyting í þeim tilfellum þar sem öll gildi breytu eru jákvæð. Til þess að kalla fram Yeo-Johnson umbreytingu getum við notað `preProcess()` fallið úr `caret` pakkanum, sem skrifaður er af Max Kuhn, öðrum höfundi bókarinnar.
 
 ```{r 3_1_yj}
 pp_object_Glass <- preProcess(Glass, method = c("center", "scale", "YeoJohnson"))
@@ -164,17 +169,166 @@ glass_yj_tidy <- glass_yj %>%
 glass_cs_tidy <- glass_cs %>% 
     gather(-Type, key = "efni", value = "gildi")
 
-glass_saman <- bind_rows("Fyrir" = glass_cs_tidy, "Eftir" = glass_yj_tidy, .id = "nafn")
+glass_saman <- bind_rows("Fyrir" = glass_cs_tidy, "Eftir" = glass_yj_tidy, .id = "Y-J umbreyting")
 
 glass_saman %>% 
-  ggplot(mapping = aes(x = gildi, color = nafn, fill = nafn)) +
+  ggplot(mapping = aes(x = gildi, color = `Y-J umbreyting`, fill = `Y-J umbreyting`)) +
     geom_density(alpha = 0.2) +
     facet_wrap(~efni, scales = "free")
 
 
 ```
 
+# Hefur umbreytingin einhver áhrif á spágetu?
+
+```{r}
+train_ind <- caret::createDataPartition(y = glass_cs$Type, p = 0.85, list = FALSE)
+pred_vars <- 1:9
+
+training_set_raw <- Glass[train_ind, ]
+training_set <- glass_cs[train_ind, ]
+training_set_yj <- glass_yj[train_ind, ]
+
+test_set_raw <- Glass[train_ind, ]
+test_set <- glass_cs[-train_ind, ]
+test_set_yj <- glass_yj[-train_ind, ]
+```
+
+
+```{r}
+library(doParallel)
+cl <- makeCluster(7)
+registerDoParallel(cl)
+
+upph <- proc.time()
+
+mod_xgb <- train(x = training_set[, pred_vars], y = training_set$Type,
+                 method = "xgbTree",
+                 trControl = trainControl(
+                   method = "repeatedcv", number = 5,
+                   repeats = 5,
+                   allowParallel = TRUE
+                 )
+)
+
+timi <- proc.time() - upph
+
+stopCluster(cl)
+
+```
+
+
+```{r}
+library(doParallel)
+cl <- makeCluster(7)
+registerDoParallel(cl)
+
+upph <- proc.time()
+
+mod_xgb_yj <- train(x = training_set_yj[, pred_vars], y = training_set_yj$Type,
+                 method = "xgbTree",
+                 trControl = trainControl(
+                   method = "repeatedcv", number = 5,
+                   repeats = 5,
+                   allowParallel = TRUE
+                 )
+)
+
+timi <- proc.time() - upph
+
+stopCluster(cl)
+```
+
+
+```{r}
+test_set %>% 
+  mutate(Type_pred = predict(mod_xgb, .)) %>% 
+  yardstick::metrics(Type, Type_pred)
+
+test_set_yj %>% 
+  mutate(Type_pred = predict(mod_xgb_yj, .)) %>% 
+  yardstick::metrics(Type, Type_pred)
+
+```
+
+```{r}
+training_set_raw$Type <- as.factor(training_set_raw$Type)
+levels(training_set_raw$Type) <- c("One", "Two", "Three", "Five", "Six", "Seven")
+
+cl <- makeCluster(7)
+registerDoParallel(cl)
+
+library(caretEnsemble)
+control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
+algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') #'rpart', 'svmRadial', 'amdai', 'nnet', 'AdaBag', 'bstTree'
+#Include   'xgbTree',  'C5.0'
+models_raw <- caretList(Type~., data=training_set_raw, trControl=control, methodList=algorithmList)
+results_raw <- resamples(models_raw)
+
+stopCluster(cl)
+```
 
 
 
+```{r}
+training_set$Type <- as.factor(training_set$Type)
+levels(training_set$Type) <- c("One", "Two", "Three", "Five", "Six", "Seven")
+
+cl <- makeCluster(7)
+registerDoParallel(cl)
+
+library(caretEnsemble)
+control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
+algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') #'rpart', 'svmRadial', 'amdai', 'nnet', 'AdaBag', 'bstTree'
+#Include   'xgbTree',  'C5.0'
+models <- caretList(Type~., data=training_set, trControl=control, methodList=algorithmList)
+results <- resamples(models)
+
+stopCluster(cl)
+```
+
+
+```{r}
+training_set_yj$Type <- as.factor(training_set_yj$Type)
+levels(training_set_yj$Type) <- c("One", "Two", "Three", "Five", "Six", "Seven")
+
+cl <- makeCluster(7)
+registerDoParallel(cl)
+
+library(caretEnsemble)
+control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
+algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') #'rpart', 'svmRadial', 'amdai', 'nnet', 'AdaBag', 'bstTree'
+#Include   'xgbTree',  'C5.0'
+models_yj <- caretList(Type~., data=training_set_yj, trControl=control, methodList=algorithmList)
+results_yj <- resamples(models_yj)
+
+stopCluster(cl)
+```
+
+
+```{r}
+library(broom)
+list("yj" = broom::tidy(summary(results_yj$values)),
+     "raw" = broom::tidy(summary(results_raw$values)),
+     "cs" = broom::tidy(summary(results$values))) %>%
+  map(~filter(., 
+              str_detect(Var2, "Accuracy"),
+              str_detect(Freq, "Mean"))) %>% 
+  map(~mutate(., 
+              Freq = str_remove(Freq, "Mean   :"),
+              Var2 = str_remove(Var2, "~Accuracy"))) %>%
+  map(~select(.,
+              -Var1)) %>% 
+  map(~mutate_all(.,
+                  str_trim, side = "both")) %>%
+  map(~rename(., 
+              model = Var2,
+              accuracy = Freq)) %>% 
+  bind_rows(.id = "preprocess") %>% 
+  mutate(preprocess = fct_relevel(preprocess, "raw")) %>% 
+  ggplot(aes(x = preprocess, y = accuracy, fill = preprocess)) +
+  geom_col() +
+  facet_wrap(~model) 
+
+```
 
