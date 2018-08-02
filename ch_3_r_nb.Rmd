@@ -154,7 +154,7 @@ glass_cs <- predict(pp_object_Glass_cs, Glass)
 
 ```
 
-Prófum sama şéttnirit og áğur, nú eftir Yeo-Johnson umbreytingu.
+Prófum sambærilegt şéttnirit og áğur. Berum saman tvær mismunandi uppskriftir ağ forvinnslu. Annars vegar miğjun og skölun, og hins vegar miğjun, skölun og Yeo-Johnson umbreytingu.
 
 ```{r}
 glass_yj %>% 
@@ -180,6 +180,8 @@ glass_saman %>%
 ```
 
 # Hefur umbreytingin einhver áhrif á spágetu?
+
+
 
 ```{r}
 train_ind <- caret::createDataPartition(y = glass_cs$Type, p = 0.85, list = FALSE)
