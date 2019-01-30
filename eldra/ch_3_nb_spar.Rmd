@@ -24,7 +24,6 @@ library(corrplot)
 library(caret)
 library(viridis)
 library(yardstick)
-library(doParallel)
 ```
 
 Nú þegar við höfum hlaðið inn `mlbench` pakkanum getum við sótt `Glass` gögnin með `data()` aðgerðinni og skoðum strúktúr gagnanna með `str()` fallinu.
@@ -180,30 +179,84 @@ glass_saman %>%
 
 ```
 
-# Eru einhverjar forvinnsluaðgerðir líklegar til að bæta spár um flokkun glersins?
-
-Til þess að svara því liggur beinast við að forvinna gögnin eftir mismunandi uppskriftum og spá því næst fyrir um tegundir glers út frá skýribreytunum. Við búum til þjálfunarsett og prófunarsett til að vinna með. `training_set_raw` og `test_set_raw` eru grunngögnin án nokkurar forvinnslu. Í `training_set_cs` og `test_set_cs` eru gögnin miðjuð og sköluð (e. centering and scaling). Í `training_set_yj` og `test_set_yj`eru gögnin miðjuð og sköluð auk þess að notast er við Yeo-Johnson umbyltingu.
-
-Við notumst við 3 sinnum 10 brota cross-validation í öllum tilvikum. Við búum til samleik af líkönum (e. model ensemble) með `caretEnsemble` pakkanum. 
+# Hefur umbreytingin einhver áhrif á spágetu?
 
 
 
 ```{r}
 train_ind <- caret::createDataPartition(y = glass_cs$Type, p = 0.85, list = FALSE)
-pred_vars <- 1:9 # Dálkanúmer skýribreytanna
+pred_vars <- 1:9
 
 training_set_raw <- Glass[train_ind, ]
-training_set_cs <- glass_cs[train_ind, ]
+training_set <- glass_cs[train_ind, ]
 training_set_yj <- glass_yj[train_ind, ]
 
 test_set_raw <- Glass[train_ind, ]
-test_set_cs <- glass_cs[-train_ind, ]
+test_set <- glass_cs[-train_ind, ]
 test_set_yj <- glass_yj[-train_ind, ]
 ```
 
-Þegar við höfum skilgreint þjálfunarsett og prófunersett hefjumst við handa við að þjálfa líkanið á hráu, óunnu gögnunum. `knn` er næsta-nágranna líkan (e. nearest neighbour), `treebag` er *bagged trees* líkan, `rf` er slembiskógur (e. random forest), `rpart` er einfalt ákvarðanatré (e. decision tree), `svmRadial` er stuðningsvigra líkan með kúlulaga ákvörðunarskilum (e. support vector machines using a radial decision boundary). Þessi nálgun er tekin skammlaust frá Kaggle notandanum **nafn**. 
 
-Hér nota ég 7 kjarna til að skipta útreikningunum niður á. Ef þú hyggst keyra þessa útreikninga á eigin vélbúnaði þarf að taka mið af fjölda kjarna í örgjörva vélbúnaðarins sem útreikningarnir fara fram á. 
+```{r}
+library(doParallel)
+cl <- makeCluster(7)
+registerDoParallel(cl)
+
+upph <- proc.time()
+
+mod_xgb <- train(x = training_set[, pred_vars], y = training_set$Type,
+                 method = "xgbTree",
+                 trControl = trainControl(
+                   method = "repeatedcv", number = 5,
+                   repeats = 5,
+                   allowParallel = TRUE
+                 )
+)
+
+timi <- proc.time() - upph
+
+stopCluster(cl)
+
+```
+
+
+```{r}
+library(doParallel)
+cl <- makeCluster(7)
+registerDoParallel(cl)
+
+upph <- proc.time()
+
+mod_xgb_yj <- train(x = training_set_yj[, pred_vars], y = training_set_yj$Type,
+                 method = "xgbTree",
+                 trControl = trainControl(
+                   method = "repeatedcv", number = 5,
+                   repeats = 5,
+                   allowParallel = TRUE
+                 )
+)
+
+timi <- proc.time() - upph
+
+stopCluster(cl)
+```
+
+
+```{r}
+test_set %>% 
+  mutate(Type_pred = predict(mod_xgb, .)) %>% 
+  yardstick::metrics(Type, Type_pred)
+
+test_set_yj %>% 
+  mutate(Type_pred = predict(mod_xgb_yj, .)) %>% 
+  yardstick::metrics(Type, Type_pred)
+
+```
+
+```{r}
+identical(mod_xgb, mod_xgb_yj)
+```
+
 
 ```{r}
 training_set_raw$Type <- as.factor(training_set_raw$Type)
@@ -214,32 +267,33 @@ registerDoParallel(cl)
 
 library(caretEnsemble)
 control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
-algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') 
+algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') #'rpart', 'svmRadial', 'amdai', 'nnet', 'AdaBag', 'bstTree'
+#Include   'xgbTree',  'C5.0'
 models_raw <- caretList(Type~., data=training_set_raw, trControl=control, methodList=algorithmList)
 results_raw <- resamples(models_raw)
 
 stopCluster(cl)
 ```
 
-Því næst gerum við hið nákvæmlega sama fyrir gagnasettið sem hefur verið skalað og miðjað. 
+
 
 ```{r}
-training_set_cs$Type <- as.factor(training_set_cs$Type)
-levels(training_set_cs$Type) <- c("One", "Two", "Three", "Five", "Six", "Seven")
+training_set$Type <- as.factor(training_set$Type)
+levels(training_set$Type) <- c("One", "Two", "Three", "Five", "Six", "Seven")
 
 cl <- makeCluster(7)
 registerDoParallel(cl)
 
 library(caretEnsemble)
 control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
-algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') 
-models_cs <- caretList(Type~., data=training_set_cs, trControl=control, methodList=algorithmList)
-results_cs <- resamples(models_cs)
+algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') #'rpart', 'svmRadial', 'amdai', 'nnet', 'AdaBag', 'bstTree'
+#Include   'xgbTree',  'C5.0'
+models <- caretList(Type~., data=training_set, trControl=control, methodList=algorithmList)
+results <- resamples(models)
 
 stopCluster(cl)
 ```
 
-Og því næst gagnasettið með skölun, miðjun og Yeo-Johnson umbyltingu.
 
 ```{r}
 training_set_yj$Type <- as.factor(training_set_yj$Type)
@@ -250,21 +304,20 @@ registerDoParallel(cl)
 
 library(caretEnsemble)
 control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
-algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') 
+algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') #'rpart', 'svmRadial', 'amdai', 'nnet', 'AdaBag', 'bstTree'
+#Include   'xgbTree',  'C5.0'
 models_yj <- caretList(Type~., data=training_set_yj, trControl=control, methodList=algorithmList)
 results_yj <- resamples(models_yj)
 
 stopCluster(cl)
 ```
 
-Þegar við höfum þjálfað áðurnefnd líkön á þremur mismunandi 'forvinnslu-uppskriftum' skoðum við áhrif forvinnslu á spánákvæmni. 
-
 
 ```{r}
 library(broom)
 list("yj" = broom::tidy(summary(results_yj$values)),
      "raw" = broom::tidy(summary(results_raw$values)),
-     "cs" = broom::tidy(summary(results_cs$values))) %>%
+     "cs" = broom::tidy(summary(results$values))) %>%
   map(~filter(., 
               str_detect(Var2, "Accuracy"),
               str_detect(Freq, "Mean"))) %>% 
