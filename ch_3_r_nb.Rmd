@@ -1,19 +1,23 @@
 ---
-title: "Kafli 3: Forvinnsla gagna"
-subtitle: 'Applied Predictive Modeling'
-author: "Hlynur Hallgrímsson"
-date: "15 janúar 2018"
-output: html_notebook
+title: 'Kafli 3: Forvinnsla gagna'
+author: "Hlynur HallgrÃ­msson"
+date: "15 janÃºar 2018"
+output:
+  html_document:
+    df_print: paged
+subtitle: Applied Predictive Modeling
+editor_options:
+  chunk_output_type: console
 ---
 
 
-Í şessari færslu ætla ég ağ vinna mig í gegnum æfingarnar í şriğja kafla bókarinnar [Applied Predictive Modeling](http://appliedpredictivemodeling.com/) eftir Max Kuhn og Kjell Johnson. 
+Ã Ã¾essari fÃ¦rslu Ã¦tla Ã©g aÃ° vinna mig Ã­ gegnum Ã¦fingarnar Ã­ Ã¾riÃ°ja kafla bÃ³karinnar [Applied Predictive Modeling](http://appliedpredictivemodeling.com/) eftir Max Kuhn og Kjell Johnson. 
 
 ### 3.1 Gler
 
-Í fyrstu æfingunni notumst viğ viğ gagnasett úr *The UC Irvine Machine Learning Repository* sem snır ağ greiningu mismunandi tegunda glers út frá ljósbrotsstuğli og samspili 8 mismunandi frumefna: **Na, Mg Al, Si, K, Ca, Ba** og **Fe**. 
+Ã fyrstu Ã¦fingunni notumst viÃ° viÃ° gagnasett Ãºr *The UC Irvine Machine Learning Repository* sem snÃ½r aÃ° greiningu mismunandi tegunda glers Ãºt frÃ¡ ljÃ³sbrotsstuÃ°li og samspili 8 mismunandi frumefna: **Na, Mg Al, Si, K, Ca, Ba** og **Fe**. 
 
-Viğ nálgumst gögnin í `mlbench` pakkann, en auk hans hlöğum viğ inn öğrum pökkum sem viğ munum nota viğ úrvinnslu verkefnisins. 
+ViÃ° nÃ¡lgumst gÃ¶gnin Ã­ `mlbench` pakkann, en auk hans hlÃ¶Ã°um viÃ° inn Ã¶Ã°rum pÃ¶kkum sem viÃ° munum nota viÃ° Ãºrvinnslu verkefnisins. 
 
 
 ```{r 3_1_load_packages, warning = FALSE, echo = TRUE}
@@ -22,12 +26,15 @@ library(AppliedPredictiveModeling)
 library(tidyverse)
 library(corrplot)
 library(caret)
+library(caretEnsemble)
 library(viridis)
 library(yardstick)
 library(doParallel)
+library(broom)
+library(janitor)
 ```
 
-Nú şegar viğ höfum hlağiğ inn `mlbench` pakkanum getum viğ sótt `Glass` gögnin meğ `data()` ağgerğinni og skoğum strúktúr gagnanna meğ `str()` fallinu.
+NÃº Ã¾egar viÃ° hÃ¶fum hlaÃ°iÃ° inn `mlbench` pakkanum getum viÃ° sÃ³tt `Glass` gÃ¶gnin meÃ° `data()` aÃ°gerÃ°inni og skoÃ°um strÃºktÃºr gagnanna meÃ° `str()` fallinu.
 
 ```{r 3_1_load_data}
 data(Glass)
@@ -36,11 +43,11 @@ str(Glass)
 
 ```
 
-Viğ sjáum ağ `Glass` er gagnarammi meğ 214 athugunum á 10 breytum. Şar af eru níu talnabreytur og ein şáttabreyta. 
+ViÃ° sjÃ¡um aÃ° `Glass` er gagnarammi meÃ° 214 athugunum Ã¡ 10 breytum. Ãar af eru nÃ­u talnabreytur og ein Ã¾Ã¡ttabreyta. 
 
-Nú skulum viğ vinda okkur í verkefnin.
+NÃº skulum viÃ° vinda okkur Ã­ verkefnin.
 
-#### Leiğbeiningarnar eru eftirfarandi
+#### LeiÃ°beiningarnar eru eftirfarandi
 
 * a) Using vizualisations, explore the predictor variables to understand their distributions as well as the relationships between predictors
 * b) Do there appear to be any outliers in the data? Are any predictors skewed?
@@ -48,10 +55,10 @@ Nú skulum viğ vinda okkur í verkefnin.
 
 
 
-Eins og svo oft er ef til vill best hér ağ byrja meğ tíğniriti eğa şéttniriti til ağ sjá dreifingu gilda innan hverrar skıribreytu. 
+Eins og svo oft er ef til vill best hÃ©r aÃ° byrja meÃ° tÃ­Ã°niriti eÃ°a Ã¾Ã©ttniriti til aÃ° sjÃ¡ dreifingu gilda innan hverrar skÃ½ribreytu. 
 
 ```{r 3_1_tidnirit}
-#Şéttnirit
+#ÃÃ©ttnirit
 Glass %>%
   gather(-Type, key = "efni", value = "gildi") %>%
   ggplot(mapping = aes(x = gildi)) +
@@ -66,22 +73,22 @@ Glass %>%
 
 ```
 
-Viğ sjáum ağ şónokkur skekking er til stağar fyrir efnin **Ba, Ca, Fe** og ljósbrotsstuğulinn **RI**. Auk şess eru **K** og **Mg** tvítoppa. Şá virğist vera nokkuğ greinilegur útlagi í **K**. 
+ViÃ° sjÃ¡um aÃ° Ã¾Ã³nokkur skekking er til staÃ°ar fyrir efnin **Ba, Ca, Fe** og ljÃ³sbrotsstuÃ°ulinn **RI**. Auk Ã¾ess eru **K** og **Mg** tvÃ­toppa. ÃÃ¡ virÃ°ist vera nokkuÃ° greinilegur Ãºtlagi Ã­ **K**. 
 
-Şví næst skoğum viğ fylgnirit milli skıribreytanna og notum til şess `corrplot` pakkann sem viğ höfum nú şegar hlağiğ inn. 
+ÃvÃ­ nÃ¦st skoÃ°um viÃ° fylgnirit milli skÃ½ribreytanna og notum til Ã¾ess `corrplot` pakkann sem viÃ° hÃ¶fum nÃº Ã¾egar hlaÃ°iÃ° inn. 
 
 ```{r 3_1_fylgnirit}
-#Skilgreinum hvağa dálkar innihalda skıribreytur svo hægt sé ağ vísa til şeirra meğ nafni
+#Skilgreinum hvaÃ°a dÃ¡lkar innihalda skÃ½ribreytur svo hÃ¦gt sÃ© aÃ° vÃ­sa til Ã¾eirra meÃ° nafni
 skyribreytur <- names(Glass)[1:9]
 
-#Til ağ laga corrplot er merkingum ása leyft ağ fara yfir spássíur meğ eftirfarandi breytingu
+#Til aÃ° laga corrplot er merkingum Ã¡sa leyft aÃ° fara yfir spÃ¡ssÃ­ur meÃ° eftirfarandi breytingu
 par(xpd = TRUE)
 #Fylgniplott
 fylgni <- cor(Glass[, skyribreytur])
 corrplot(fylgni, method = "square", mar = c(1, 1, 1, 1))
 ```
 
-Viğ sjáum strax ağ şağ er eitthvağ um fylgni milli skıribreyta. Sterkust er greinilega jákvæğ fylgni milli ljósbrotsstuğulsins **RI** og svo **Ca** og şvínæst neikvæğ fylgni milli ljósbrotsstuğulsins **RI** og **Si**. Şess fyrir utan er erfitt ağ gera sér grein fyrir şví út frá litunum hver fylgnin sé í raun. Ef til vill væri şægilegt breyta litunum, og jafnvel ağ sjá şetta sett fram sem stöplarit. 
+ViÃ° sjÃ¡um strax aÃ° Ã¾aÃ° er eitthvaÃ° um fylgni milli skÃ½ribreyta. Sterkust er greinilega jÃ¡kvÃ¦Ã° fylgni milli ljÃ³sbrotsstuÃ°ulsins **RI** og svo **Ca** og Ã¾vÃ­nÃ¦st neikvÃ¦Ã° fylgni milli ljÃ³sbrotsstuÃ°ulsins **RI** og **Si**. Ãess fyrir utan er erfitt aÃ° gera sÃ©r grein fyrir Ã¾vÃ­ Ãºt frÃ¡ litunum hver fylgnin sÃ© Ã­ raun. Ef til vill vÃ¦ri Ã¾Ã¦gilegt breyta litunum, og jafnvel aÃ° sjÃ¡ Ã¾etta sett fram sem stÃ¶plarit. 
   
 
 
@@ -89,9 +96,9 @@ Viğ sjáum strax ağ şağ er eitthvağ um fylgni milli skıribreyta. Sterkust er grei
 fylgni_df <- as_data_frame(fylgni) %>% 
   mutate(names = rownames(fylgni)) %>% 
   gather(-names, key = "key", value = "Fylgni") %>% 
-  mutate(var_1 = pmin(names, key), # Setjum breytuna sem er á undan í stafrófinu í dálkinn var_1
-         var_2 = pmax(names, key)) %>% # og breytuna sem er á eftir í stafrófinu í dálkinn var_2
-  distinct(var_1, var_2, Fylgni) # og er hægt ağ ná í einstakar samsetningar meğ distinct
+  mutate(var_1 = pmin(names, key), # Setjum breytuna sem er Ã¡ undan Ã­ stafrÃ³finu Ã­ dÃ¡lkinn var_1
+         var_2 = pmax(names, key)) %>% # og breytuna sem er Ã¡ eftir Ã­ stafrÃ³finu Ã­ dÃ¡lkinn var_2
+  distinct(var_1, var_2, Fylgni) # og er hÃ¦gt aÃ° nÃ¡ Ã­ einstakar samsetningar meÃ° distinct
 
 fylgni_df %>%
   mutate(Fylgni = if_else(var_1 == var_2, NA_real_, Fylgni)) %>%
@@ -100,7 +107,7 @@ fylgni_df %>%
   scale_fill_viridis()
 
 fylgni_df_utd <- fylgni_df %>% 
-  filter(var_1 != var_2) %>% # Fjarlægjum fylgni breytu viğ sjálfa sig 
+  filter(var_1 != var_2) %>% # FjarlÃ¦gjum fylgni breytu viÃ° sjÃ¡lfa sig 
   arrange(Fylgni) %>% 
   unite(var_1, var_2, sep = "/", col = "Efni")
 
@@ -108,8 +115,8 @@ nota_palette <- c("#bbbbbb", "#F8766D", "#00BFC4")
 throskuldur <- 0.32
 
 fylgni_df_utd %>% 
-  mutate(Skipting = case_when(Fylgni > throskuldur ~ "Tiltölulega sterk jákvæğ fylgni",
-                              Fylgni < -throskuldur ~ "Tiltölulega sterk neikvæğ fylgni",
+  mutate(Skipting = case_when(Fylgni > throskuldur ~ "TiltÃ¶lulega sterk jÃ¡kvÃ¦Ã° fylgni",
+                              Fylgni < -throskuldur ~ "TiltÃ¶lulega sterk neikvÃ¦Ã° fylgni",
                               TRUE ~ "Minni fylgni")) %>% 
   ggplot(mapping = aes(x = as.numeric(rownames(.)), y = Fylgni, fill = Skipting)) +
   geom_bar(stat = "identity") +
@@ -119,8 +126,8 @@ fylgni_df_utd %>%
 
 
 fylgni_df_utd %>% 
-  filter(abs(Fylgni) > 0.32) %>% # Fjarlægjum fylgni sem er ekki meiri en +- 0.32
-  mutate(Formerki = if_else(Fylgni >= 0, "Jákvætt", "Neikvætt")) %>% 
+  filter(abs(Fylgni) > 0.32) %>% # FjarlÃ¦gjum fylgni sem er ekki meiri en +- 0.32
+  mutate(Formerki = if_else(Fylgni >= 0, "JÃ¡kvÃ¦tt", "NeikvÃ¦tt")) %>% 
   ggplot(mapping = aes(x = as.numeric(rownames(.)), y = Fylgni, fill = Formerki)) +
   geom_bar(stat = "identity") +
   geom_text(mapping = aes(label = Efni, vjust = if_else(Fylgni > 0, -0.9, 1.6))) +
@@ -129,20 +136,20 @@ fylgni_df_utd %>%
   coord_cartesian(ylim = c(-0.6, 0.9))
 ```
 
-Şá sjáum viğ ağ ef ağ viğ notum ljósbrotsstuğul **RI** sem skıribreytu fyrir tegund glersins, şá er efniğ **Ca** ağ fara ağ veita okkur minnstar viğbótarupplısingar, og öfugt. Şannig væri líklega okkar fyrsta verk ağ fjarlægja annağ hvort **RI** eğa **Ca** sem skıribreytu ef ağ viğ vildum fækka fjölda skıribreyta til ağ einfalda spálíkaniğ okkar. 
+ÃÃ¡ sjÃ¡um viÃ° aÃ° ef aÃ° viÃ° notum ljÃ³sbrotsstuÃ°ul **RI** sem skÃ½ribreytu fyrir tegund glersins, Ã¾Ã¡ er efniÃ° **Ca** aÃ° fara aÃ° veita okkur minnstar viÃ°bÃ³tarupplÃ½singar, og Ã¶fugt. Ãannig vÃ¦ri lÃ­klega okkar fyrsta verk aÃ° fjarlÃ¦gja annaÃ° hvort **RI** eÃ°a **Ca** sem skÃ½ribreytu ef aÃ° viÃ° vildum fÃ¦kka fjÃ¶lda skÃ½ribreyta til aÃ° einfalda spÃ¡lÃ­kaniÃ° okkar. 
 
-# Forvinnsluağgerğir
-## Til ağ leiğrétta fyrir skekkingu í dreifingu
+# ForvinnsluaÃ°gerÃ°ir
+## Til aÃ° leiÃ°rÃ©tta fyrir skekkingu Ã­ dreifingu
 
 
-Til ağ leiğrétta fyrir skekkingu í dreifingu skıribreytanna væri ákjósanlegt ağ geta beitt fyrir sig Box-Cox umbreytingu. Til şess şurfa öll gildi ağ vera stærri en núll. Şví şurfum viğ ağ athuga hvort einhver núllgildi eğa neikvæğ gildi leynist í einhverjum skıribreytanna. Til şess ağ auğvelda okkur şağ notum viğ `map()` falliğ úr `purrr` pakkanum. Viğ höfum şegar hlağiğ inn `purrr` hér ağ ofan um leiğ og viğ hlóğum inn `tidyverse` pakkasamstæğunni. 
+Til aÃ° leiÃ°rÃ©tta fyrir skekkingu Ã­ dreifingu skÃ½ribreytanna vÃ¦ri Ã¡kjÃ³sanlegt aÃ° geta beitt fyrir sig Box-Cox umbreytingu. Til Ã¾ess Ã¾urfa Ã¶ll gildi aÃ° vera stÃ¦rri en nÃºll. ÃvÃ­ Ã¾urfum viÃ° aÃ° athuga hvort einhver nÃºllgildi eÃ°a neikvÃ¦Ã° gildi leynist Ã­ einhverjum skÃ½ribreytanna. Til Ã¾ess aÃ° auÃ°velda okkur Ã¾aÃ° notum viÃ° `map()` falliÃ° Ãºr `purrr` pakkanum. ViÃ° hÃ¶fum Ã¾egar hlaÃ°iÃ° inn `purrr` hÃ©r aÃ° ofan um leiÃ° og viÃ° hlÃ³Ã°um inn `tidyverse` pakkasamstÃ¦Ã°unni. 
 
 ```{r 3_1_null_e_neikvaett}
 Glass[, skyribreytur] %>% 
 map(~sum(. <= 0)) %>% unlist()
 ```
 
-Einungis **RI, Na, Al, Si** og **Ca** innihalda bara jákvæğ gildi, en hin ekki. Viğ sjáum şví strax ağ Box-Cox umbreyting er ekki valkostur fyrir allar skıribreyturnar, né şá heldur log-umbreyting. Şá prófum viğ Yeo-Johnson umbreytingu, en hún er ekki alls ósvipuğ Box-Cox nema fyrir şağ ağ gildi mega vera neikvæğ eğa núll. Raunar er Yeo-Johnson umbreytingin í reynd Box-Cox umbreyting í şeim tilfellum şar sem öll gildi breytu eru jákvæğ. Til şess ağ kalla fram Yeo-Johnson umbreytingu getum viğ notağ `preProcess()` falliğ úr `caret` pakkanum, sem skrifağur er af Max Kuhn, öğrum höfundi bókarinnar.
+Einungis **RI, Na, Al, Si** og **Ca** innihalda bara jÃ¡kvÃ¦Ã° gildi, en hin ekki. ViÃ° sjÃ¡um Ã¾vÃ­ strax aÃ° Box-Cox umbreyting er ekki valkostur fyrir allar skÃ½ribreyturnar, nÃ© Ã¾Ã¡ heldur log-umbreyting. ÃÃ¡ prÃ³fum viÃ° Yeo-Johnson umbreytingu, en hÃºn er ekki alls Ã³svipuÃ° Box-Cox nema fyrir Ã¾aÃ° aÃ° gildi mega vera neikvÃ¦Ã° eÃ°a nÃºll. Raunar er Yeo-Johnson umbreytingin Ã­ reynd Box-Cox umbreyting Ã­ Ã¾eim tilfellum Ã¾ar sem Ã¶ll gildi breytu eru jÃ¡kvÃ¦Ã°. Til Ã¾ess aÃ° kalla fram Yeo-Johnson umbreytingu getum viÃ° notaÃ° `preProcess()` falliÃ° Ãºr `caret` pakkanum, sem skrifaÃ°ur er af Max Kuhn, Ã¶Ã°rum hÃ¶fundi bÃ³karinnar.
 
 ```{r 3_1_yj}
 pp_object_Glass <- preProcess(Glass, method = c("center", "scale", "YeoJohnson"))
@@ -155,7 +162,7 @@ glass_cs <- predict(pp_object_Glass_cs, Glass)
 
 ```
 
-Prófum sambærilegt şéttnirit og áğur. Berum saman tvær mismunandi uppskriftir ağ forvinnslu. Annars vegar miğjun og skölun, og hins vegar miğjun, skölun og Yeo-Johnson umbreytingu.
+PrÃ³fum sambÃ¦rilegt Ã¾Ã©ttnirit og Ã¡Ã°ur. Berum saman tvÃ¦r mismunandi uppskriftir aÃ° forvinnslu. Annars vegar miÃ°jun og skÃ¶lun, og hins vegar miÃ°jun, skÃ¶lun og Yeo-Johnson umbreytingu.
 
 ```{r}
 glass_yj %>% 
@@ -180,17 +187,17 @@ glass_saman %>%
 
 ```
 
-# Eru einhverjar forvinnsluağgerğir líklegar til ağ bæta spár um flokkun glersins?
+# Eru einhverjar forvinnsluaÃ°gerÃ°ir lÃ­klegar til aÃ° bÃ¦ta spÃ¡r um flokkun glersins?
 
-Til şess ağ svara şví liggur beinast viğ ağ forvinna gögnin eftir mismunandi uppskriftum og spá şví næst fyrir um tegundir glers út frá skıribreytunum. Viğ búum til şjálfunarsett og prófunarsett til ağ vinna meğ. `training_set_raw` og `test_set_raw` eru grunngögnin án nokkurar forvinnslu. Í `training_set_cs` og `test_set_cs` eru gögnin miğjuğ og sköluğ (e. centering and scaling). Í `training_set_yj` og `test_set_yj`eru gögnin miğjuğ og sköluğ auk şess ağ notast er viğ Yeo-Johnson umbyltingu.
+Til Ã¾ess aÃ° svara Ã¾vÃ­ liggur beinast viÃ° aÃ° forvinna gÃ¶gnin eftir mismunandi uppskriftum og spÃ¡ Ã¾vÃ­ nÃ¦st fyrir um tegundir glers Ãºt frÃ¡ skÃ½ribreytunum. ViÃ° bÃºum til Ã¾jÃ¡lfunarsett og prÃ³funarsett til aÃ° vinna meÃ°. `training_set_raw` og `test_set_raw` eru grunngÃ¶gnin Ã¡n nokkurar forvinnslu. Ã `training_set_cs` og `test_set_cs` eru gÃ¶gnin miÃ°juÃ° og skÃ¶luÃ° (e. centering and scaling). Ã `training_set_yj` og `test_set_yj`eru gÃ¶gnin miÃ°juÃ° og skÃ¶luÃ° auk Ã¾ess aÃ° notast er viÃ° Yeo-Johnson umbyltingu.
 
-Viğ notumst viğ 3 sinnum 10 brota cross-validation í öllum tilvikum. Viğ búum til samleik af líkönum (e. model ensemble) meğ `caretEnsemble` pakkanum. 
+ViÃ° notumst viÃ° 3 sinnum 10 brota cross-validation Ã­ Ã¶llum tilvikum. ViÃ° bÃºum til samleik af lÃ­kÃ¶num (e. model ensemble) meÃ° `caretEnsemble` pakkanum. 
 
 
 
 ```{r}
 train_ind <- caret::createDataPartition(y = glass_cs$Type, p = 0.85, list = FALSE)
-pred_vars <- 1:9 # Dálkanúmer skıribreytanna
+pred_vars <- 1:9 # DÃ¡lkanÃºmer skÃ½ribreytanna
 
 training_set_raw <- Glass[train_ind, ]
 training_set_cs <- glass_cs[train_ind, ]
@@ -201,9 +208,9 @@ test_set_cs <- glass_cs[-train_ind, ]
 test_set_yj <- glass_yj[-train_ind, ]
 ```
 
-Şegar viğ höfum skilgreint şjálfunarsett og prófunersett hefjumst viğ handa viğ ağ şjálfa líkaniğ á hráu, óunnu gögnunum. `knn` er næsta-nágranna líkan (e. nearest neighbour), `treebag` er *bagged trees* líkan, `rf` er slembiskógur (e. random forest), `rpart` er einfalt ákvarğanatré (e. decision tree), `svmRadial` er stuğningsvigra líkan meğ kúlulaga ákvörğunarskilum (e. support vector machines using a radial decision boundary). Şessi nálgun er tekin skammlaust frá Kaggle notandanum **nafn**. 
+Ãegar viÃ° hÃ¶fum skilgreint Ã¾jÃ¡lfunarsett og prÃ³funersett hefjumst viÃ° handa viÃ° aÃ° Ã¾jÃ¡lfa lÃ­kaniÃ° Ã¡ hrÃ¡u, Ã³unnu gÃ¶gnunum. `knn` er nÃ¦sta-nÃ¡granna lÃ­kan (e. nearest neighbour), `treebag` er *bagged trees* lÃ­kan, `rf` er slembiskÃ³gur (e. random forest), `rpart` er einfalt Ã¡kvarÃ°anatrÃ© (e. decision tree), `svmRadial` er stuÃ°ningsvigra lÃ­kan meÃ° kÃºlulaga Ã¡kvÃ¶rÃ°unarskilum (e. support vector machines using a radial decision boundary). Ãessi nÃ¡lgun er tekin skammlaust frÃ¡ Kaggle notandanum **nafn**. 
 
-Hér nota ég 7 kjarna til ağ skipta útreikningunum niğur á. Ef şú hyggst keyra şessa útreikninga á eigin vélbúnaği şarf ağ taka miğ af fjölda kjarna í örgjörva vélbúnağarins sem útreikningarnir fara fram á. 
+HÃ©r nota Ã©g 7 kjarna til aÃ° skipta Ãºtreikningunum niÃ°ur Ã¡. Ef Ã¾Ãº hyggst keyra Ã¾essa Ãºtreikninga Ã¡ eigin vÃ©lbÃºnaÃ°i Ã¾arf aÃ° taka miÃ° af fjÃ¶lda kjarna Ã­ Ã¶rgjÃ¶rva vÃ©lbÃºnaÃ°arins sem Ãºtreikningarnir fara fram Ã¡. 
 
 ```{r}
 training_set_raw$Type <- as.factor(training_set_raw$Type)
@@ -212,7 +219,6 @@ levels(training_set_raw$Type) <- c("One", "Two", "Three", "Five", "Six", "Seven"
 cl <- makeCluster(7)
 registerDoParallel(cl)
 
-library(caretEnsemble)
 control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
 algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') 
 models_raw <- caretList(Type~., data=training_set_raw, trControl=control, methodList=algorithmList)
@@ -221,7 +227,7 @@ results_raw <- resamples(models_raw)
 stopCluster(cl)
 ```
 
-Şví næst gerum viğ hiğ nákvæmlega sama fyrir gagnasettiğ sem hefur veriğ skalağ og miğjağ. 
+ÃvÃ­ nÃ¦st gerum viÃ° hiÃ° nÃ¡kvÃ¦mlega sama fyrir gagnasettiÃ° sem hefur veriÃ° skalaÃ° og miÃ°jaÃ°. 
 
 ```{r}
 training_set_cs$Type <- as.factor(training_set_cs$Type)
@@ -230,7 +236,6 @@ levels(training_set_cs$Type) <- c("One", "Two", "Three", "Five", "Six", "Seven")
 cl <- makeCluster(7)
 registerDoParallel(cl)
 
-library(caretEnsemble)
 control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
 algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') 
 models_cs <- caretList(Type~., data=training_set_cs, trControl=control, methodList=algorithmList)
@@ -239,7 +244,7 @@ results_cs <- resamples(models_cs)
 stopCluster(cl)
 ```
 
-Og şví næst gagnasettiğ meğ skölun, miğjun og Yeo-Johnson umbyltingu.
+Og Ã¾vÃ­ nÃ¦st gagnasettiÃ° meÃ° skÃ¶lun, miÃ°jun og Yeo-Johnson umbyltingu.
 
 ```{r}
 training_set_yj$Type <- as.factor(training_set_yj$Type)
@@ -248,7 +253,6 @@ levels(training_set_yj$Type) <- c("One", "Two", "Three", "Five", "Six", "Seven")
 cl <- makeCluster(7)
 registerDoParallel(cl)
 
-library(caretEnsemble)
 control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions="final", classProbs=TRUE)
 algorithmList <- c('knn', 'treebag', 'rf', 'rpart', 'svmRadial') 
 models_yj <- caretList(Type~., data=training_set_yj, trControl=control, methodList=algorithmList)
@@ -257,32 +261,28 @@ results_yj <- resamples(models_yj)
 stopCluster(cl)
 ```
 
-Şegar viğ höfum şjálfağ áğurnefnd líkön á şremur mismunandi 'forvinnslu-uppskriftum' skoğum viğ áhrif forvinnslu á spánákvæmni. 
+Ãegar viÃ° hÃ¶fum Ã¾jÃ¡lfaÃ° Ã¡Ã°urnefnd lÃ­kÃ¶n Ã¡ Ã¾remur mismunandi 'forvinnslu-uppskriftum' skoÃ°um viÃ° Ã¡hrif forvinnslu Ã¡ spÃ¡nÃ¡kvÃ¦mni. 
 
 
 ```{r}
-library(broom)
-list("yj" = broom::tidy(summary(results_yj$values)),
-     "raw" = broom::tidy(summary(results_raw$values)),
-     "cs" = broom::tidy(summary(results_cs$values))) %>%
-  map(~filter(., 
-              str_detect(Var2, "Accuracy"),
-              str_detect(Freq, "Mean"))) %>% 
-  map(~mutate(., 
-              Freq = str_remove(Freq, "Mean   :"),
-              Var2 = str_remove(Var2, "~Accuracy"))) %>%
-  map(~select(.,
-              -Var1)) %>% 
-  map(~mutate_all(.,
-                  str_trim, side = "both")) %>%
-  map(~rename(., 
-              model = Var2,
-              accuracy = Freq)) %>% 
-  bind_rows(.id = "preprocess") %>% 
-  mutate(preprocess = fct_relevel(preprocess, "raw")) %>% 
-  ggplot(aes(x = preprocess, y = accuracy, fill = preprocess)) +
+list("yj" = results_yj$values,
+    "raw" = results_raw$values,
+    "cs" = results_cs$values) %>% 
+  map(~as_tibble(.)) %>% 
+  map(~clean_names(.)) %>% 
+  bind_rows(.id = "pre_process") %>% 
+  group_by(pre_process) %>% 
+  summarize_at(.vars = vars(-1),
+               .funs = mean) %>% 
+  pivot_longer(-pre_process, names_to = "metric", values_to = "value") %>% 
+  filter(str_detect(metric, "kappa")) %>% 
+  mutate(metric = str_remove(metric, "_kappa")) %>% 
+  rename(model = metric,
+         kappa = value) %>% 
+  arrange(model, pre_process) %>%  
+  mutate(pre_process = fct_relevel(pre_process, "raw")) %>% 
+  ggplot(aes(x = pre_process, y = kappa, fill = pre_process)) +
   geom_col() +
-  facet_wrap(~model) 
-
+  facet_wrap(~model)  
 ```
 
